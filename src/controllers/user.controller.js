@@ -41,7 +41,7 @@ const registerUser = asyncHandler(async (req, res) => {
   ) {
     throw new ApiError(400, "Field Missing");
   }
-
+  
   const existedUser = await User.findOne({
     $or: [{ username }, { email }],
   });
@@ -90,8 +90,18 @@ const registerUser = asyncHandler(async (req, res) => {
     throw new ApiError(500, "Something went wrong while registering the user");
   }
 
+  //Login the just register user
+  var { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
+
+  const options = {
+    httpOnly: true,
+    secure: true,
+  };
+
   return res
     .status(200)
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
     .json(new ApiResponse(200, createdUser, "User registered successfully"));
   // res.status(200).json({
   //   message: 'ok',
@@ -115,6 +125,7 @@ const loginUser = asyncHandler(async (req, res) => {
   const user = await User.findOne({
     $or: [{ username }, { email }],
   });
+
   if (!user) {
     throw new ApiError(404, "User does not exist");
   }
@@ -128,6 +139,7 @@ const loginUser = asyncHandler(async (req, res) => {
   var { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
     user._id
   );
+  
   const loggedInUser = await User.findById(user._id).select(
     "-password -refreshToken"
   );
