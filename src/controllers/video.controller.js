@@ -101,15 +101,14 @@ const publishAVideo = asyncHandler(async (req, res) => {
     }
     const thumbnailFile = await uploadOnCloudinary(thumbnailLocalPath);
 
-    const user = await User.findById(req.user?._id).select("-password -refreshToken -watchHistory");
-
+    // const user = await User.findById(req.user?._id).select("-password -refreshToken -watchHistory");
     const video = await Video.create({
         videoFile: videoFile.url,
         thumbnail: thumbnailFile.url,
         title,
         description,
         duration: videoFile.duration,
-        owner : user
+        owner : req.user?._id
     });
 
     return res.status(200)
