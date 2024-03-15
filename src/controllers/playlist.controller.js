@@ -10,8 +10,12 @@ const createPlaylist = asyncHandler(async (req, res) => {
     const { name, description } = req.body
     //TODO: create playlist
 
-    if ( [name, description].some((field) => field?.trim() === "")) {
-        throw new ApiError(404, "Name and Description both are required");
+    // if ( [name, description].some((field) => field?.trim() === "")) {
+    //     throw new ApiError(404, "Name and Description both are required");
+    // }
+
+    if (!name) {
+        throw new ApiError(404, "Playlist name is required");
     }
 
     const playlist = await Playlist.findOne({ name: name });
@@ -33,7 +37,7 @@ const createPlaylist = asyncHandler(async (req, res) => {
 const getUserPlaylists = asyncHandler(async (req, res) => {
     const { userId } = req.params
     //TODO: get user playlists
-
+    console.log(userId,'userId');
     if (!userId) {
         throw new ApiError(400, "User Id is required");
     }
@@ -48,7 +52,8 @@ const getUserPlaylists = asyncHandler(async (req, res) => {
             $project: {
                 _id: 1,
                 name: 1,
-                description:1
+                description:1,
+                videos: 1
             }
         }
     ]);
@@ -84,6 +89,7 @@ const getPlaylistById = asyncHandler(async (req, res) => {
 const addVideoToPlaylist = asyncHandler(async (req, res) => {
     const { playlistId, videoId } = req.params
     
+    console.log(playlistId, videoId, 'videoId');
     if (!playlistId || !videoId) {
         throw new ApiError(400, "Playlist Id and Video Id both are required");
     }

@@ -21,6 +21,10 @@ const likeSchema = new Schema({
     ref: "Tweet",
     default: null
   },
+  isLike: {
+    type: Boolean,
+    default: true // true for like, false for dislike
+  }
 }, { timestamps: true });
 
 export const Like = mongoose.model("Like", likeSchema);

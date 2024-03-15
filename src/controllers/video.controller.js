@@ -13,68 +13,117 @@ const getAllVideos = asyncHandler(async (req, res) => {
     if (!userId) {
         userId = req.user?._id;
     }
-    const skip =  (parseInt(page) - 1) * limit;
+    // const skip =  (parseInt(page) - 1) * limit;
     
-    const videos = await Video.aggregate([
-        {
-            $match: {
-                owner: new mongoose.Types.ObjectId(userId),
-            }
-        },
-        {
-            $sort: {
-                createdAt: sortType === 'asc' ? 1 : -1
-            }
-        },
-        {
-            $skip: skip
-        },
-        {
-            $limit: parseInt(limit)
-        }
-    ]);
-
-    // // Constructing match stage for filtering based on userId and query
-    // const matchStage = {
-    //     $match: {
-    //         owner: mongoose.Types.ObjectId(userId)
+    // const videos = await Video.aggregate([
+    //     // {
+    //     //     $match: {
+    //     //         owner: new mongoose.Types.ObjectId(userId),
+    //     //     }
+    //     // },
+    //     {
+    //         $sort: {
+    //             createdAt: sortType === 'asc' ? 1 : -1
+    //         }
+    //     },
+    //     {
+    //         $skip: skip
+    //     },
+    //     {
+    //         $limit: parseInt(limit)
+    //     },
+    //     {
+    //         $lookup: {
+    //             from: "users",
+    //             localField: "owner",
+    //             foreignField: "_id",
+    //             as: "owner"
+    //         }
+    //     },
+    //     {
+    //         $addFields: {
+    //             owner: {
+    //                 $first: "$owner"
+    //             }
+    //         }
+    //     },
+    //     {
+    //         $project: {
+    //             thumbnail: 1,
+    //             title: 1,
+    //             duration: 1,
+    //             views: 1,
+    //             createdAt: 1,
+    //             "owner.username": 1,
+    //             "owner.avatar": 1,
+    //         }
     //     }
-    // };
+    // ]);
+    
+    const matchStage = {
+        $match: {
+            // owner: new mongoose.Types.ObjectId(userId)
+        }
+    };
 
-    // if (query) {
-    //     matchStage.$match.$text = { $search: query }; // Assuming text search for query
-    // }
+    if (query) {
+        matchStage.$match.$text = { $search: query }; 
+    }
 
-    // // Constructing sort stage based on sortBy and sortType
-    // const sortStage = {
-    //     $sort: {}
-    // };
+    const sortStage = {
+        $sort: {}
+    };
 
-    // if (sortBy && sortType) {
-    //     sortStage.$sort[sortBy] = sortType === 'asc' ? 1 : -1;
-    // } else {
-    //     sortStage.$sort['createdAt'] = 1; // Default sorting
-    // }
+    if (sortBy && sortType) {
+        sortStage.$sort[sortBy] = sortType === 'asc' ? 1 : -1;
+    } else {
+        sortStage.$sort['createdAt'] = 1; 
+    }
 
-    // // Pagination
-    // const skip = (parseInt(page) - 1) * limit;
+    const skip = (parseInt(page) - 1) * limit;
 
-    // const paginationStage = {
-    //     $skip: skip
-    // };
+    const paginationStage = {
+        $skip: skip
+    };
 
-    // // Aggregation pipeline
-    // const pipeline = [
-    //     matchStage,
-    //     sortStage,
-    //     paginationStage,
-    //     { $limit: parseInt(limit) }
-    // ];
+    const pipeline = [
+        matchStage,
+        sortStage,
+        paginationStage,
+        { $limit: parseInt(limit) },
+        {
+            $lookup: {
+                from: "users",
+                localField: "owner",
+                foreignField: "_id",
+                as: "owner"
+            }
+        },
+        {
+            $addFields: {
+                owner: {
+                    $first: "$owner"
+                }
+            }
+        },
+        {
+            $project: {
+                thumbnail: 1,
+                title: 1,
+                duration: 1,
+                views: 1,
+                createdAt: 1,
+                description: 1,
+                "owner.username": 1,
+                "owner.avatar": 1,
+            }
+        }
+    ];
 
-    // const videos = await Video.aggregate(pipeline);
+    const videos = await Video.aggregate(pipeline);
 
     return res.status(200)
-    .json(new ApiResponse(200, videos, "This is working..."))
+    .json(new ApiResponse(200, videos, "Videos fetched successfully"))
 });
 
 const publishAVideo = asyncHandler(async (req, res) => {
@@ -127,14 +176,62 @@ const getVideoById = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Video Id is required");
     }
 
-    const video = await Video.findById(videoId);
+    // const video = await Video.findById(videoId);
+
+    const video = await Video.aggregate([
+        {
+            $match: {
+                _id: new mongoose.Types.ObjectId(videoId)
+            }
+        },
+        {
+            $lookup: {
+                from: "users",
+                localField: "owner",
+                foreignField: "_id",
+                as: "owner"
+            }
+        },
+        {
+            $addFields: {
+                owner: {
+                    $first: "$owner"
+                }
+            }
+        },
+        {
+            $project: {
+                createdAt: 1,
+                description: 1,
+                thumbnail: 1,
+                title: 1,
+                videoFile: 1,
+                views: 1,
+                viewedBy: 1,
+                "owner.username": 1,
+                "owner.avatar": 1,
+                "owner._id": 1,
+            }
+        }
+    ]);
 
     if (!video) {
         throw new ApiError(404, "Video not available");
     }
 
+    const { _id } = req.user;
+
+    const viewedByStrings = video[0].viewedBy.map(viewerId => viewerId.toString());
+
+    if (video[0].owner._id.toString() !== _id && !viewedByStrings.includes(_id.toString())) {
+        await Video.findByIdAndUpdate(videoId, {
+            $inc: { views: 1 },
+            $addToSet: { viewedBy: _id }
+        });
+    }
+
     res.status(200)
-    .json(new ApiResponse(200, video, "Vide Id am getting"))
+    .json(new ApiResponse(200, video[0], "Video fetched successfully"))
 });
 
 const updateVideo = asyncHandler(async (req, res) => {

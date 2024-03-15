@@ -68,6 +68,7 @@ const getVideoComments = asyncHandler(async (req, res) => {
 const addComment = asyncHandler(async (req, res) => {
     // TODO: add a comment to a video
     const { videoId } = req.params;
+    console.log(videoId,'videoId');
 
     if (!videoId) {
         throw new ApiError(400, "Video ID is required");
